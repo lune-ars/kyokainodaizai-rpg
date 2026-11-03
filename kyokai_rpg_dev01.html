@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>境界の旅団 - RPG 開発版</title>
+<style>
+:root{--bg:#101827;--panel:#1b2940;--line:#405675;--gold:#f3c86c;--text:#eef4ff;--muted:#aebbd0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#2a4161,#101827 65%);color:var(--text);font-family:system-ui,"Meiryo",sans-serif}
+header{padding:14px 18px;background:#101827eF;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0}
+.brand{font-weight:900;color:var(--gold);letter-spacing:.1em}.resources{color:var(--gold);font-weight:bold}
+main{max-width:1100px;margin:20px auto;padding:0 15px}.hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:17px;margin-bottom:14px}
+h1,h2{margin:0 0 10px;color:var(--gold)}h1{font-size:clamp(1.5rem,4vw,2.3rem)}h2{font-size:1.1rem}
+p{color:var(--muted)}nav{display:flex;gap:7px;flex-wrap:wrap;margin:15px 0}
+button,select{background:linear-gradient(#3c587c,#293e5b);border:1px solid #637c9e;color:white;padding:9px 12px;border-radius:9px;cursor:pointer;font:inherit}button:disabled{opacity:.4}
+.tab.active{background:linear-gradient(#97733b,#684d27);border-color:var(--gold)}
+.panel{display:none}.panel.active{display:block}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.item,.stage{background:#22334d;border:1px solid #405675;border-radius:11px;padding:12px;margin:8px 0}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.muted{color:var(--muted);font-size:.9rem}
+.badge{color:#9be1ee;border:1px solid #527b91;border-radius:99px;padding:2px 8px;font-size:.78rem}
+.stage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.arena{min-height:230px;background:linear-gradient(#243c52,#354c45);border:1px solid #637c9e;border-radius:13px;padding:16px;display:flex;justify-content:space-around;align-items:center;gap:10px}
+.unit{background:#101b2cdd;border:1px solid #7189a8;border-radius:12px;padding:12px;text-align:center;min-width:100px;cursor:pointer}.unit.selected{outline:3px solid var(--gold)}.face{font-size:2rem}
+.bar{height:8px;background:#080e18;border-radius:9px;overflow:hidden;margin-top:5px}.fill{height:100%;background:#e46c77}
+.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+.log{background:#0c1421;border:1px solid var(--line);border-radius:10px;padding:10px;height:150px;overflow:auto;font-size:.9rem}
+.good{color:#8fe0ad}.bad{color:#ff9292}.notice{border-left:3px solid var(--gold);padding:8px 12px;background:#293b54}
+footer{text-align:center;color:#8292aa;padding:20px;font-size:.8rem}
+@media(max-width:600px){header{display:block}.resources{margin-top:8px}.arena{flex-wrap:wrap}.unit{min-width:85px}}
+</style></head>
+<body>
+<header><div class="brand">✦ 境界の旅団</div><div class="resources">🪙 <span id="gold">120</span> G　｜　📍 <span id="progress">1-1</span></div></header>
+<main>
+<section class="hero"><h1>境界の旅団</h1><p>仲間を集め、装備を鍛え、境界の先に待つ最高ステージを目指せ。</p><div class="notice">開発版 0.1｜ステージ攻略・戦闘・仲間編成・装備・ショップ・セーブを搭載。</div></section>
+<nav>
+<button class="tab active" data-tab="home">🏰 ホーム</button><button class="tab" data-tab="stages">🗺️ ステージ</button><button class="tab" data-tab="battle">⚔️ 戦闘</button><button class="tab" data-tab="party">👥 仲間</button><button class="tab" data-tab="gear">🛡️ 装備</button><button class="tab" data-tab="town">🏘️ 拠点</button><button class="tab" data-tab="book">📚 図鑑</button>
+</nav>
+<section id="home" class="panel active"><div class="grid">
+<div class="card"><h2>旅団本部</h2><p>境界の裂け目から魔物が現れ始めた。旅団を編成して調査を進めよう。</p><p>討伐数：<b id="kills">0</b>　仲間：<b id="count">1</b>人</p><button onclick="tab('stages')">冒険に出る</button></div>
+<div class="card"><h2>難易度</h2><select id="difficulty" onchange="state.diff=this.value;save()"><option>Easy</option><option selected>Normal</option><option>Hard</option></select><p>どの難易度でも先のステージほど敵が強くなる。</p><button onclick="save(true)">💾 手動セーブ</button></div>
+<div class="card"><h2>次の目標</h2><p id="goal">1-1「薄明の草原」をクリアしよう。</p><button onclick="start(state.unlocked)">次のステージへ</button></div></div></section>
+<section id="stages" class="panel"><div class="card"><h2>ステージ選択</h2><p>大ステージごとに3つの小ステージがある。クリア済みの場所にも再挑戦できる。</p><div id="stageList" class="stage-grid"></div></div></section>
+<section id="battle" class="panel"><div class="grid">
+<div class="card"><h2 id="battleTitle">戦闘フィールド</h2><div class="arena"><div id="allies"></div><div id="enemy"></div></div><div class="actions"><button onclick="attack()">⚔️ 通常攻撃</button><button onclick="skill()">✨ スキル</button><button onclick="guard()">🛡️ 防御</button><button onclick="potion()">🧪 回復薬</button></div><p class="muted">味方を選択して操作キャラクターを切り替えられるよ。</p></div>
+<div class="card"><h2>戦闘ログ</h2><div class="row"><span>操作中</span><b id="activeName">レン</b></div><div class="log" id="log">冒険の準備は整った。</div><p id="battleStatus" class="notice">ステージを選んで戦闘開始。</p><button onclick="tab('stages')">ステージ一覧へ</button></div></div></section>
+<section id="party" class="panel"><div class="grid"><div class="card"><h2>所持キャラクター</h2><div id="roster"></div></div><div class="card"><h2>出撃編成（最大5人）</h2><div id="formation"></div></div></div></section>
+<section id="gear" class="panel"><div class="grid"><div class="card"><h2>装備管理</h2><div id="gearChars"></div></div><div class="card"><h2>所持装備・ショップ</h2><div id="weapons"></div></div></div></section>
+<section id="town" class="panel"><div class="grid"><div class="card"><h2>拠点施設</h2><div id="facilities"></div></div><div class="card"><h2>旅人のショップ</h2><button onclick="buyPotion()">回復薬を購入（35G）</button><p>回復薬：<b id="potions">3</b>個</p></div></div></section>
+<section id="book" class="panel"><div class="grid"><div class="card"><h2>モンスター図鑑</h2><div id="monsterBook"></div></div><div class="card"><h2>実績</h2><div id="achievements"></div></div></div></section>
+</main><footer>境界の旅団 — 開発版 0.1｜セーブデータはこのブラウザ内に保存されます。</footer>
+<script>
+const $=id=>document.getElementById(id);
+const stages=[
+["薄明の草原","草原スライム","🟢",48,9,20,"野犬","🐺",65,12,25,"草原の守護獣","🦌",130,16,70],
+["囁きの森","毒キノコ","🍄",105,17,40,"森の狼","🐺",140,21,50,"古代樹","🌳",290,28,140],
+["灰燼火山","火山トカゲ","🦎",220,30,75,"溶岩ゴーレム","🗿",310,36,95,"熔王イグニス","🐉",580,48,280],
+["凍結遺跡","氷結兵","🧊",390,45,120,"遺跡の番犬","🐕",470,52,140,"白銀の女王","👑",900,70,450],
+["境界の深淵","虚無の影","👤",750,70,190,"異界の騎士","🛡️",980,82,240,"境界の支配者","👁️",1950,110,950]
+];
+const base=()=>({gold:120,unlocked:1,cleared:[],kills:0,diff:"Normal",potion:3,ore:3,crystal:0,herb:0,active:"ren",formation:["ren"],owned:["ren"],weapons:["sword","staff"],equipped:{ren:"sword"},facility:{guild:1,smith:0,alchemy:0,training:0,shop:1}});
+let state=base(),chars=[
+{id:"ren",name:"レン",face:"🗡️",role:"剣士",rarity:"R",hp:120,max:120,atk:18,def:8,mp:30,maxmp:30,skill:"連斬",element:"風",weapon:"sword"},
+{id:"mira",name:"ミラ",face:"🔮",role:"魔導士",rarity:"SR",hp:85,max:85,atk:23,def:4,mp:50,maxmp:50,skill:"火球",element:"炎",weapon:"staff"},
+{id:"toto",name:"トト",face:"🐾",role:"獣人斥候",rarity:"R",hp:98,max:98,atk:16,def:6,mp:35,maxmp:35,skill:"足止め罠",element:"土",weapon:"dagger"},
+{id:"luna",name:"ルナ",face:"🧚",role:"精霊 healer",rarity:"SSR",hp:95,max:95,atk:11,def:5,mp:60,maxmp:60,skill:"癒やしの光",element:"光",weapon:"staff"},
+{id:"garm",name:"ガルム",face:"🤖",role:"機械兵",rarity:"UR",hp:165,max:165,atk:21,def:15,mp:25,maxmp:25,skill:"重装シールド",element:"雷",weapon:"sword"}
+];
+let weapons=[{id:"sword",name:"旅人の剣",atk:4,cost:0},{id:"staff",name:"樫の杖",atk:2,cost:0},{id:"dagger",name:"狩人の短剣",atk:7,cost:180},{id:"flame",name:"火紋の大剣",atk:16,cost:650}];
+let battle=null,guarding=false,known=["slime"],bosses=0;
+function save(show=false){localStorage.setItem("kyokaiPartyRPG",JSON.stringify(state));if(show)alert("セーブしました！")}
+function load(){try{let x=JSON.parse(localStorage.getItem("kyokaiPartyRPG"));if(x)state={...base(),...x}}catch(e){}}
+function tab(id){document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===id));document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===id));render()}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
+function stageName(id){return stages[Math.floor((id-1)/3)]?.[0]||"未知の領域"}
+function start(id){if(id>state.unlocked)return;let si=Math.floor((id-1)/3),n=(id-1)%3,s=stages[si],offset=1+(si*.25),diff={Easy:.75,Normal:1,Hard:1.4}[state.diff],name=s[1+n*5],face=s[2+n*5],hp=Math.round(s[3+n*5]*offset*diff),atk=Math.round(s[4+n*5]*offset*diff),gold=s[5+n*5];battle={id,name,face,hp,max:hp,atk,gold,over:false};guarding=false;state.active=state.formation[0];$("log").innerHTML="";say(`${name} が現れた！`);tab("battle");}
+function say(t,cls=""){let p=document.createElement("p");p.textContent=t;p.className=cls;$("log").appendChild(p);$("log").scrollTop=$("log").scrollHeight}
+function active(){return chars.find(c=>c.id===state.active)}
+function weaponBonus(c){let id=state.equipped[c.id]||c.weapon;return weapons.find(w=>w.id===id)?.atk||0}
+function renderBattle(){if(!battle)return;$("battleTitle").textContent=stageName(battle.id)+" — "+battle.id;$("allies").innerHTML=state.formation.map(id=>{let c=chars.find(x=>x.id===id);return `<div class="unit ${state.active===id?"selected":""}" onclick="selectChar('${id}')"><div class="face">${c.face}</div><b>${c.name}</b><div class="muted">HP ${c.hp}/${c.max}</div><div class="bar"><div class="fill" style="width:${c.hp/c.max*100}%"></div></div></div>`}).join("");$("enemy").innerHTML=`<div class="unit"><div class="face">${battle.face}</div><b>${battle.name}</b><div class="muted">HP ${Math.max(0,battle.hp)}/${battle.max}</div><div class="bar"><div class="fill" style="width:${Math.max(0,battle.hp/battle.max*100)}%"></div></div></div>`;$("activeName").textContent=active()?.name||"—";$("battleStatus").textContent=battle.over?(battle.hp<=0?"勝利！報酬を獲得した。":"敗北…。仲間や装備を見直そう。"):"敵の攻撃は行動後に反撃してくる。"}
+function selectChar(id){if(state.formation.includes(id)){state.active=id;renderBattle()}}
+function enemyHit(){if(!battle||battle.over)return;let alive=state.formation.map(id=>chars.find(c=>c.id===id)).filter(c=>c.hp>0);if(!alive.length){battle.over=true;say("旅団は敗北した。","bad");renderBattle();return}let c=alive[Math.floor(Math.random()*alive.length)],d=Math.max(1,battle.atk-c.def);if(guarding){d=Math.ceil(d*.25);guarding=false}c.hp=Math.max(0,c.hp-d);say(`${battle.name} の攻撃！ ${c.name} に ${d} ダメージ。`,"bad");if(c.hp===0)say(`${c.name} は戦闘不能！`,"bad");if(state.formation.every(id=>chars.find(c=>c.id===id).hp<=0)){battle.over=true;say("旅団は敗北した。","bad")}renderBattle()}
+function attack(){if(!battle||battle.over)return;let c=active(),d=Math.max(1,c.atk+weaponBonus(c)-Math.floor(Math.random()*4));battle.hp-=d;say(`${c.name} の攻撃！ ${d} ダメージ。`,"good");afterAction()}
+function skill(){if(!battle||battle.over)return;let c=active();if(c.mp<10){say("MPが足りない。");return}c.mp-=10;if(c.id==="luna"){state.formation.forEach(id=>{let a=chars.find(x=>x.id===id);a.hp=Math.min(a.max,a.hp+35)});say("癒やしの光！味方全員のHPを回復。","good")}else if(c.id==="toto"){battle.atk=Math.ceil(battle.atk*.75);say("足止め罠！敵の攻撃力を下げた。","good")}else if(c.id==="garm"){guarding=true;say("重装シールド！次の攻撃を軽減。","good")}else{let d=c.atk*2+12;battle.hp-=d;say(`${c.skill}！ ${d} ダメージ。`,"good")}afterAction()}
+function guard(){if(!battle||battle.over)return;guarding=true;say(`${active().name} は防御態勢をとった。`);enemyHit()}
+function potion(){if(!battle||battle.over||state.potion<1)return;let c=active(),h=Math.min(55,c.max-c.hp);if(!h){say("HPは満タンだ。");return}state.potion--;c.hp+=h;say(`${c.name} のHPが ${h} 回復！`,"good");enemyHit();render()}
+function afterAction(){if(battle.hp<=0){win();return}enemyHit();render()}
+function win(){battle.hp=0;battle.over=true;state.gold+=battle.gold;state.kills++;state.ore++;let id=battle.id;state.cleared.push(id);state.unlocked=Math.max(state.unlocked,id+1);let si=Math.floor((id-1)/3),n=(id-1)%3;if(n===2){bosses++;if(si===0&&!state.owned.includes("mira")){state.owned.push("mira");state.formation.push("mira");state.equipped.mira="staff";say("仲間「ミラ」が加入した！","good")}if(si===1&&!state.owned.includes("toto")){state.owned.push("toto");state.formation.push("toto");state.equipped.toto="dagger";say("仲間「トト」が加入した！","good")}}known.push(battle.name);state.formation.forEach(id=>{let c=chars.find(x=>x.id===id);c.hp=Math.max(1,Math.min(c.max,c.hp+20));c.mp=Math.min(c.maxmp,c.mp+8)});say(`勝利！ ${battle.gold}G と鉄鉱石を獲得！`,"good");render();save()}
+function toggle(id){if(state.formation.includes(id)){if(state.formation.length===1)return alert("最低1人必要です");state.formation=state.formation.filter(x=>x!==id)}else if(state.formation.length<5)state.formation.push(id);else alert("最大5人です");state.active=state.formation[0];render();save()}
+function buyPotion(){if(state.gold<35)return alert("ゴールドが足りません");state.gold-=35;state.potion++;render();save()}
+function buyWeapon(id){let w=weapons.find(x=>x.id===id);if(state.weapons.includes(id))return alert("所持済みです");if(state.gold<w.cost)return alert("ゴールドが足りません");state.gold-=w.cost;state.weapons.push(id);render();save()}
+function equip(cid,wid){state.equipped[cid]=wid;render();save()}
+function upgrade(id){let cost=100+state.facility[id]*100;if(state.gold<cost)return alert("ゴールドが足りません");state.gold-=cost;state.facility[id]++;render();save()}
+function render(){ $("gold").textContent=state.gold;$("progress").textContent=state.unlocked;$("kills").textContent=state.kills;$("count").textContent=state.owned.length;$("potions").textContent=state.potion;$("goal").textContent=`${state.unlocked}「${stageName(state.unlocked)}」をクリアしよう。`;
+$("stageList").innerHTML=stages.map((s,i)=>`<div class="stage"><b style="color:var(--gold)">STAGE ${i+1}：${s[0]}</b><p>${["草原の入口","魔物の群れ","ボスエリア"].map((n,j)=>{let id=i*3+j+1;return `<button ${id>state.unlocked?"disabled":""} onclick="start(${id})">${i+1}-${j+1} ${n} ${state.cleared.includes(id)?"✓":""}</button>`}).join(" ")}</p></div>`).join("");
+$("roster").innerHTML=state.owned.map(id=>{let c=chars.find(x=>x.id===id);return `<div class="item"><div class="row"><b>${c.face} ${c.name}</b><span class="badge">${c.rarity}</span></div><p>${c.role}｜HP ${c.hp}/${c.max}｜攻撃 ${c.atk}｜防御 ${c.def}</p><p>${c.skill}・${c.element}属性</p><button onclick="toggle('${id}')">${state.formation.includes(id)?"編成から外す":"編成に入れる"}</button></div>`}).join("");
+$("formation").innerHTML=state.formation.map((id,i)=>{let c=chars.find(x=>x.id===id);return `<div class="item">${i+1}. ${c.face} ${c.name} <span class="badge">出撃中</span></div>`}).join("")+`<p class="muted">編成上限：5人</p>`;
+$("gearChars").innerHTML=state.owned.map(id=>{let c=chars.find(x=>x.id===id);return `<div class="item"><b>${c.name}</b><p>武器：${weapons.find(w=>w.id===(state.equipped[id]||c.weapon))?.name}</p><select onchange="equip('${id}',this.value)">${state.weapons.map(wid=>{let w=weapons.find(x=>x.id===wid);return `<option value="${wid}" ${(state.equipped[id]||c.weapon)===wid?"selected":""}>${w.name}（攻撃+${w.atk}）</option>`}).join("")}</select></div>`}).join("");
+$("weapons").innerHTML=weapons.map(w=>`<div class="item"><b>${w.name}</b><p>攻撃 +${w.atk}</p>${state.weapons.includes(w.id)?"所持済み":`<button onclick="buyWeapon('${w.id}')">${w.cost}Gで購入</button>`}</div>`).join("");
+$("facilities").innerHTML=Object.entries({guild:"ギルド",smith:"鍛冶屋",alchemy:"錬金術屋",training:"訓練所",shop:"ショップ"}).map(([id,n])=>`<div class="item"><b>${n} Lv.${state.facility[id]}</b><button onclick="upgrade('${id}')">強化（${100+state.facility[id]*100}G）</button></div>`).join("");
+$("monsterBook").innerHTML=["草原スライム","野犬","草原の守護獣","毒キノコ","森の狼","古代樹","火山トカゲ","溶岩ゴーレム","熔王イグニス","氷結兵","白銀の女王","境界の支配者"].map(n=>`<div class="item">${known.includes(n)?"📗 "+n:"🔒 ？？？"}</div>`).join("");
+$("achievements").innerHTML=[["初勝利",state.kills>=1],["討伐者（10体）",state.kills>=10],["仲間を2人集める",state.owned.length>=2],["ボス討伐",bosses>=1],["第5ステージ到達",state.unlocked>=13]].map(a=>`<div class="item">${a[1]?"🏆":"🔒"} ${a[0]}</div>`).join("");
+if(battle)renderBattle()}
+load();$("difficulty").value=state.diff;render();window.addEventListener("beforeunload",()=>save());
+</script></body></html>
